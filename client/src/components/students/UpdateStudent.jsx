@@ -24,22 +24,34 @@ const UpdateStudent = ({ fetchStudents, student, setActiveComponent }) => {
         }
 
         try {
+            const payload = {
+                name: updatedStudent.name?.trim(),
+                idNumber: updatedStudent.idNumber?.trim(),
+                parentEmail: updatedStudent.parentEmail?.trim(),
+                classNumber: Number(updatedStudent.classNumber),
+            };
+
             await Axios.put(
                 `http://localhost:1235/api/student/updateStudent/${updatedStudent._id}`,
-                updatedStudent,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
+                payload,
+                { headers: { Authorization: `Bearer ${token}` } }
             );
+
             fetchStudents();
             setActiveComponent("");
         } catch (error) {
-            console.error("Failed to update student:", error);
-            alert("Failed to update student. Please try again.");
+            // דיבוג אמיתי לראות למה השרת מחזיר 400
+            console.error("Failed to update student:", {
+                status: error.response?.status,
+                data: error.response?.data,
+            });
+            alert(
+                error.response?.data?.message ||
+                "Failed to update student. Please try again."
+            );
         }
     };
+
 
     useEffect(() => {
         setUpdatedStudent(student);

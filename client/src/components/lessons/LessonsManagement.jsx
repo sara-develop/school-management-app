@@ -49,7 +49,26 @@ const LessonsManagement = () => {
             detail: "Lesson deleted successfully",
             life: 3000,
           });
-        } catch (error) {
+        }
+        catch (error) {
+          const message = error.response?.data?.message;
+
+          if (error.response?.status === 409) {
+            toast.current.show({
+              severity: "warn",
+              summary: "Cannot Delete",
+              detail: "This lesson is used in the schedule and cannot be deleted.",
+              life: 3000,
+            });
+          } else {
+            toast.current.show({
+              severity: "error",
+              summary: "Error",
+              detail: "An error occurred while deleting the lesson.",
+              life: 3000,
+            });
+          }
+
           console.error("Error deleting lesson:", error);
         }
       },

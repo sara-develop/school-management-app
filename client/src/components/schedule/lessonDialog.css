@@ -1,0 +1,146 @@
+/* ================================
+   DIALOG BASE (CLEAN RECTANGLE)
+   ================================ */
+
+/* Remove default header completely */
+.lesson-dialog .p-dialog-header {
+    display: none !important;
+}
+
+/* Make the dialog a single rounded-box */
+.lesson-dialog.p-dialog,
+.lesson-dialog .p-dialog-content {
+    border-radius: 16px !important;
+    background: #ffffff !important;
+    border: none !important;
+    overflow: hidden !important;
+    box-shadow: 0 0 14px rgba(0, 0, 0, 0.15);
+}
+
+/* Main dialog content spacing */
+.lesson-dialog .p-dialog-content {
+    padding: 2.2rem !important;
+    padding-top: 3.5rem !important; /* space for close button */
+    animation: dialogFadeIn 0.25s ease-out;
+}
+
+/* Remove PrimeReact decorative arrows/bubbles */
+.lesson-dialog .p-dialog-content::before,
+.lesson-dialog .p-dialog-content::after,
+.lesson-dialog .p-dialog-header::before,
+.lesson-dialog .p-dialog-header::after {
+    display: none !important;
+}
+
+/* Overlay blur (background blur) */
+.p-dialog-mask.p-component-overlay {
+    backdrop-filter: blur(3px);
+}
+
+/* Smooth fade-in animation */
+@keyframes dialogFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+
+/* ================================
+   CLOSE BUTTON
+   ================================ */
+.lesson-dialog .p-button-text {
+    transition: transform 0.15s ease;
+}
+
+.lesson-dialog .p-button-text:hover {
+    transform: scale(1.15);
+}
+
+
+/* ================================
+   HEADER TEXT
+   ================================ */
+.lesson-dialog-title {
+    color: #542468;
+    font-weight: 700;
+    margin: 0;
+    text-align: center;
+    font-size: 1.6rem;
+}
+
+.lesson-dialog-subtitle {
+    color: #777;
+    text-align: center;
+    margin: 0 0 1.6rem 0;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+/* Divider line */
+.lesson-dialog-divider {
+    height: 2px;
+    width: 100%;
+    background: #eeeeee;
+    margin: 0 auto 1.8rem auto;
+}
+
+
+/* ================================
+   DROPDOWN
+   ================================ */
+.lesson-dropdown-label {
+    color: #542468;
+    font-weight: 600;
+    font-size: 1.05rem;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.lesson-dropdown .p-dropdown {
+    width: 100%;
+}
+
+.lesson-dropdown .p-dropdown-panel {
+    max-height: 300px !important;
+}
+
+/* Lesson item template */
+.lesson-item-title {
+    color: #542468;
+    font-weight: 600;
+}
+
+.lesson-item-teacher {
+    color: #777;
+    font-size: 0.85rem;
+}
+
+
+/* ================================
+   BUTTONS (SAVE / CANCEL)
+   ================================ */
+.lesson-btn-cancel {
+    border-color: #bbb !important;
+    color: #6b6b6b !important;
+    width: 130px;
+    height: 42px;
+}
+
+.lesson-btn-save {
+    background: #542468 !important;
+    border-color: #542468 !important;
+    color: #fff !important;
+    width: 130px;
+    height: 42px;
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.lesson-btn-save:hover {
+    background: #6e338d !important;
+    transform: translateY(-2px);
+}

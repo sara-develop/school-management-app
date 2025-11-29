@@ -4,7 +4,7 @@ import { Password } from "primereact/password";
 import { Button } from "primereact/button";
 import { Divider } from "primereact/divider";
 import { useNavigate } from "react-router-dom";
-import { useSelector } from 'react-redux'; // לקריאת מידע מה־Redux store
+import { useSelector } from 'react-redux';
 import Axios from "axios";
 
 import logo from "../assets/logo.png";
@@ -17,6 +17,7 @@ import "primeflex/primeflex.css";
 const Register = () => {
     const [name, setName] = useState("");
     const [id, setId] = useState("");
+    const [email, setEmail] = useState("");   // 👈 חדש
     const [password, setPassword] = useState("");
     const [error, setError] = useState(null);
     const navigate = useNavigate();
@@ -24,17 +25,15 @@ const Register = () => {
     const gray = "#58585a";
     const purple = "#542468";
 
-    const token = useSelector(state => state.user.token)  // קריאת שם המשתמש מה־Redux, או ברירת מחדל
+    const token = useSelector(state => state.user.token);
 
     const handleRegister = async () => {
-        //const token = localStorage.getItem("accessToken"); // השגת הטוקן
-
         if (!token) {
             setError("You must be logged in as admin to register a new user.");
             return;
         }
 
-        const data = { name, id, password };
+        const data = { name, id, email, password }; // 👈 הוספנו email
 
         try {
             const response = await Axios.post(
@@ -48,7 +47,7 @@ const Register = () => {
             );
 
             console.log("Register successful:", response.data);
-            navigate("/Homepage"); // ניווט לעמוד הבית לאחר רישום מוצלח
+            navigate("/Homepage");
         } catch (error) {
             console.error("Registration failed:", error.response?.data || error.message);
             setError(
@@ -127,6 +126,20 @@ const Register = () => {
                             onChange={(e) => setId(e.target.value)}
                             className="w-full"
                             placeholder="Enter your ID"
+                        />
+                    </div>
+
+                    {/* 👇 שדה חדש - Email */}
+                    <div className="mb-3">
+                        <label className="block font-bold mb-1" style={{ color: gray }}>
+                            Email
+                        </label>
+                        <InputText
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full"
+                            placeholder="Enter your email"
                         />
                     </div>
 

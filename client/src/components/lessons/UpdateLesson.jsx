@@ -14,11 +14,14 @@ const UpdateLesson = ({ lesson, fetchLessons, setActiveComponent }) => {
 
     const handleSubmit = async () => {
         try {
+            const { name, teacher } = updatedLesson;
+
             await axios.put(
                 `${API}/updateLesson/${updatedLesson._id}`,
-                updatedLesson,
+                { name, teacher },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
+
             fetchLessons();
             messagesRef.current?.show({
                 severity: 'success',
@@ -27,16 +30,30 @@ const UpdateLesson = ({ lesson, fetchLessons, setActiveComponent }) => {
                 life: 3000
             });
             setTimeout(() => setActiveComponent(""), 1500);
+
         } catch (error) {
-            messagesRef.current?.show({
-                severity: 'error',
-                summary: 'Error',
-                detail: 'An error occurred while updating the lesson.',
-                life: 3000
-            });
+            const serverMessage = error.response?.data?.message;
+
+            if (serverMessage === "No changes were made to the lesson") {
+                messagesRef.current?.show({
+                    severity: 'info',
+                    summary: 'No Changes',
+                    detail: 'No changes were made.',
+                    life: 3000
+                });
+            } else {
+                messagesRef.current?.show({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: 'An error occurred while updating the lesson.',
+                    life: 3000
+                });
+            }
+
             console.error(error);
         }
     };
+
 
     const purpleColor = '#542468';
     const buttonStyle = {

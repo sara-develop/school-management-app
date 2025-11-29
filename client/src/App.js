@@ -19,6 +19,8 @@ import StudentManagement from './components/students/StudentManagement';
 import LessonsManagement from './components/lessons/LessonsManagement';
 import Attendance from './components/attendance/Attendance';
 import AllUsers from './components/users/AllUsers';
+import ForgotPassword from './components/ForgotPassword';
+import ResetPassword from './components/ResetPassword';
 
 
 function AppContent() {
@@ -49,6 +51,8 @@ function AppContent() {
                 {/* עמוד login ללא Layout */}
                 <Route path="/" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password/:token" element={<ResetPassword />} />
 
                 {/* דפים אחרים עם Layout */}
                 <Route path="/schedule" element={<Layout><ScheduleManagement /></Layout>} />
@@ -57,6 +61,7 @@ function AppContent() {
                 <Route path="/homePage" element={<Layout><HomePage /></Layout>} />
                 <Route path="/attendance" element={<Layout><Attendance /></Layout>} />
                 <Route path="/allUsers" element={<Layout><AllUsers /></Layout>} />
+
             </Routes>
         </Router>
     );

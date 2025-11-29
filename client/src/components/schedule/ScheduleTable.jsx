@@ -76,7 +76,12 @@ const ScheduleTable = ({ classNumber }) => {
                                     <td key={day.key} className="schedule-cell">
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'center' }}>
                                             <span style={{ fontWeight: 500 }}>
-                                                {schedule[day.key]?.lessons?.[lessonIndex]?.name || 'No Lesson'}
+                                                {(() => {
+                                                    const slot = schedule[day.key]?.lessons?.find(l => l.lessonIndex === lessonIndex);
+                                                    return slot
+                                                        ? (slot.lessonId?.name || "Unknown Lesson")
+                                                        : "No Lesson";
+                                                })()}
                                             </span>
                                             <div style={{ display: 'flex', gap: '0.4rem' }}>
                                                 <Button

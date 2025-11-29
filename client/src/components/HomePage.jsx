@@ -4,22 +4,42 @@ import { useSelector } from "react-redux";
 import { HDate } from "@hebcal/core";
 import { Button } from "primereact/button";
 
-// פונקציה להמרת מספר ליום עברי
-function getHebrewDayName(date) {
-    const days = ["Sunday", "Monday", "Tuesday", "wednesday", "Thurdsay", "Frieday", "Shabbath"];
+const getHebrewDayName = (date) => {
+    const days = ["יום ראשון", "יום שני", "יום שלישי", "יום רביעי", "יום חמישי", "יום שישי", "יום שבת"];
     return days[date.getDay()];
-}
+};
 
-// פונקציה להמרת מספר לגימטריה
-function numberToHebrew(num) {
+const numberToHebrew = (num) => {
     const hebrewLetters = [
-        '', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט',
-        'י', 'יא', 'יב', 'יג', 'יד', 'טו', 'טז', 'יז', 'יח', 'יט',
-        'כ', 'כא', 'כב', 'כג', 'כד', 'כה', 'כו', 'כז', 'כח', 'כט',
-        'ל'
+        '', 'א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ז׳', 'ח׳', 'ט׳',
+        'י׳', 'יא׳', 'יב׳', 'יג׳', 'יד׳', 'טו׳', 'טז׳', 'יז׳', 'יח׳', 'יט׳',
+        'כ׳', 'כא׳', 'כב׳', 'כג׳', 'כד׳', 'כה׳', 'כו׳', 'כז׳', 'כח׳', 'כט׳',
+        'ל׳'
     ];
     return hebrewLetters[num] || num;
-}
+};
+
+
+// פונקציה להמרת שם חודש באנגלית לעברית
+const convertHebrewMonthToHebrew = (englishMonth) => {
+    const monthMap = {
+        "Tishrei": "תשרי",
+        "Cheshvan": "חשוון",
+        "Kislev": "כסלו",
+        "Tevet": "טבת",
+        "Shevat": "שבט",
+        "Adar": "אדר",
+        "Adar I": "אדר א׳",
+        "Adar II": "אדר ב׳",
+        "Nisan": "ניסן",
+        "Iyar": "אייר",
+        "Sivan": "סיוון",
+        "Tamuz": "תמוז",
+        "Av": "אב",
+        "Elul": "אלול"
+    };
+    return monthMap[englishMonth] || englishMonth;
+};
 
 const HomePage = () => {
     const navigate = useNavigate();
@@ -30,10 +50,13 @@ const HomePage = () => {
     const [gregorianDateStr, setGregorianDateStr] = useState("");
     const [timeStr, setTimeStr] = useState("");
 
+    const purple = "#542468";
+    const gray = "#58585a";
+
     useEffect(() => {
         const token = localStorage.getItem("token");
         if (!token) {
-            navigate("/login");
+            navigate("/");
         }
 
         const updateDateTime = () => {
@@ -51,7 +74,9 @@ const HomePage = () => {
             const hdate = new HDate(today);
             const hebDay = getHebrewDayName(today);
             const hebDayNum = numberToHebrew(hdate.getDate());
-            const hebMonth = hdate.getMonthName("h");
+            const rawMonth = hdate.getMonthName(); // שם החודש באנגלית
+            const hebMonth = convertHebrewMonthToHebrew(rawMonth);
+
             setHebrewDateStr(`${hebDay} ${hebDayNum} ${hebMonth}`);
         };
 
@@ -60,52 +85,49 @@ const HomePage = () => {
         return () => clearInterval(interval);
     }, [navigate]);
 
-    const handleGoToRegister = () => {
-        navigate("/register");
-    };
-
-    const handleGoToAllUsers = () => {
-        navigate("/allUsers");
-    };
-
     return (
-        <div className="p-4" style={{ direction: "ltr" }}>
-            <h1 style={{ textAlign: "left", color: "#542468", marginTop: "2rem" }}>
+        <div className="flex flex-column justify-content-start align-items-center p-4 min-h-screen bg-white">
+            <h1 style={{ color: purple, marginTop: "2rem", textAlign: "center" }}>
                 Welcome {username}
             </h1>
 
             <div style={{
-                textAlign: "left",
-                marginTop: "1rem",
-                fontSize: "1.4rem",
+                width: "100%",
+                maxWidth: "500px",
                 background: "#f7f3ff",
                 borderRadius: "12px",
                 padding: "1.5rem",
-                boxShadow: "0 2px 8px #e0d7f3"
+                marginTop: "1rem",
+                boxShadow: "0 4px 12px rgba(84,36,104,0.2)",
+                textAlign: "center"
             }}>
-                <div style={{ fontWeight: "bold", color: "#542468" }}>{hebrewDateStr}</div>
-                <div style={{ color: "#58585a", marginTop: "0.5rem" }}>Gregorian Date: {gregorianDateStr}</div>
-                <div style={{ color: "#58585a", marginTop: "0.2rem", fontSize: "1.1rem" }}>Time: {timeStr}</div>
+                <div style={{ fontWeight: "bold", color: purple, fontSize: "1.2rem" }}>{hebrewDateStr}</div>
+                <div style={{ color: gray, marginTop: "0.5rem" }}>{gregorianDateStr}</div>
+                <div style={{ color: gray, marginTop: "0.2rem", fontSize: "1.1rem" }}>Time: {timeStr}</div>
             </div>
 
             {isManager && (
-                <div style={{ marginTop: "2rem", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+                <div
+                    className="flex flex-wrap md:flex-nowrap gap-3 md:gap-4 mt-6 justify-content-center"
+                    style={{ maxWidth: "100%" }}
+                >
                     <Button
-                        label="Add New User"
+                        label="Add A New Staff Member"
                         icon="pi pi-user-plus"
-                        onClick={handleGoToRegister}
-                        style={{ backgroundColor: "#542468", borderColor: "#542468" }}
-                        className="p-button-rounded"
+                        onClick={() => navigate("/register")}
+                        className="p-button-rounded p-button-lg"
+                        style={{ backgroundColor: purple, borderColor: purple, whiteSpace: "nowrap" }}
                     />
                     <Button
-                        label="View All Users"
+                        label="View All Staff Members"
                         icon="pi pi-users"
-                        onClick={handleGoToAllUsers}
-                        style={{ backgroundColor: "#6a4c93", borderColor: "#6a4c93" }}
-                        className="p-button-rounded"
+                        onClick={() => navigate("/allUsers")}
+                        className="p-button-rounded p-button-lg"
+                        style={{ backgroundColor: "#6a4c93", borderColor: "#6a4c93", whiteSpace: "nowrap" }}
                     />
                 </div>
             )}
+
         </div>
     );
 };

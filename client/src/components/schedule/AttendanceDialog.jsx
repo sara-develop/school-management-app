@@ -1,24 +1,44 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
 import axios from 'axios';
-import { useSelector } from 'react-redux'; // לקריאת מידע מה־Redux store
-
+import { useSelector } from 'react-redux';
+import { Toast } from 'primereact/toast';
 
 const AttendanceDialog = ({ visible, onHide, selectedDay, lessonIndex, classNumber, schedule }) => {
-    const token = useSelector(state => state.user.token)  // קריאת שם המשתמש מה־Redux, או ברירת מחדל
-
+    const token = useSelector(state => state.user.token);
     const [students, setStudents] = useState([]);
     const [attendance, setAttendance] = useState([]);
 
-    // Extract lessonId from the schedule based on selected day and lesson index
-    const lessonId = schedule[selectedDay]?.lessons?.[lessonIndex]?._id;
+    const toast = useRef(null);
 
-    // Fetch students' attendance data for the given lesson
+    const slot = schedule[selectedDay]?.lessons?.[lessonIndex];
+
+    console.log("DEBUG slot:", slot);
+
+    let lessonId = null;
+
+    // 1) new schema → lessonId is a string
+    if (slot?.lessonId && typeof slot.lessonId === "string") {
+        lessonId = slot.lessonId;
+    }
+
+    // 2) populated schema → lessonId is an object {_id, name, ...}
+    else if (slot?.lessonId && typeof slot.lessonId === "object") {
+        lessonId = slot.lessonId._id;
+    }
+
+    // 3) fallback → slot._id (in case lessons array is populated directly)
+    else if (slot?._id) {
+        lessonId = slot._id;
+    }
+
+    console.log("USING LESSON ID:", lessonId);
+
     const fetchStudents = async () => {
         try {
             const response = await axios.get(
-                `http://localhost:1235/api/student/getAttendanceByLesson/${classNumber}/${selectedDay}/${lessonId}`,
+                `http://localhost:1235/api/student/getAttendanceByLesson/${classNumber}/${selectedDay}/${lessonId}/${lessonIndex}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -27,7 +47,7 @@ const AttendanceDialog = ({ visible, onHide, selectedDay, lessonIndex, classNumb
             );
 
             setStudents(response.data);
-            // Initialize attendance state with idNumber and status for each student
+
             setAttendance(
                 response.data.map((student) => ({
                     idNumber: student.idNumber,
@@ -39,28 +59,32 @@ const AttendanceDialog = ({ visible, onHide, selectedDay, lessonIndex, classNumb
         }
     };
 
-    // Fetch students whenever dialog is opened
     useEffect(() => {
         if (visible) {
             fetchStudents();
+            console.log("DEBUG selectedDay:", selectedDay);
+            console.log("DEBUG lessonIndex:", lessonIndex);
+            console.log("DEBUG schedule day:", schedule[selectedDay]);
+            console.log("DEBUG lesson slot:", schedule[selectedDay]?.lessons?.[lessonIndex]);
         }
     }, [visible]);
 
-    // Update attendance status locally when user clicks a status button
     const handleStatusChange = (idNumber, status) => {
         setAttendance((prev) =>
             prev.map((a) => (a.idNumber === idNumber ? { ...a, status } : a))
         );
     };
 
-    // Save attendance updates by sending PUT request with auth token
     const handleSaveAttendance = () => {
         if (!lessonId) {
-            alert('No lesson selected or lesson ID missing!');
-            return; // Stop if no lesson ID
+            toast.current.show({
+                severity: 'error',
+                summary: 'Error',
+                detail: 'No lesson selected!',
+                life: 3000
+            });
+            return;
         }
-
-        const token = localStorage.getItem('token');
 
         axios
             .put(
@@ -69,7 +93,7 @@ const AttendanceDialog = ({ visible, onHide, selectedDay, lessonIndex, classNumb
                     classNumber,
                     day: selectedDay,
                     lessonId,
-                    lessonIndex, // Sending lesson index too if needed by backend
+                    lessonIndex,
                     attendanceUpdates: attendance,
                 },
                 {
@@ -79,13 +103,31 @@ const AttendanceDialog = ({ visible, onHide, selectedDay, lessonIndex, classNumb
                 }
             )
             .then(() => {
-                console.log('Attendance saved successfully');
+                toast.current.show({
+                    severity: 'success',
+                    summary: 'Saved',
+                    detail: 'Attendance updated successfully',
+                    life: 2500
+                });
                 onHide();
             })
             .catch((err) => {
                 console.error('Error updating attendance:', err);
-                alert('Error updating attendance. Please try again later.');
+                toast.current.show({
+                    severity: 'error',
+                    summary: 'Update failed',
+                    detail: 'Error updating attendance. Please try again later.',
+                    life: 3000
+                });
             });
+
+        console.log("=== SENDING TO SERVER ===");
+        console.log("classNumber:", classNumber);
+        console.log("day:", selectedDay);
+        console.log("lessonId:", lessonId);
+        console.log("lessonIndex:", lessonIndex);
+        console.log("attendanceUpdates:", attendance);
+
     };
 
     return (
@@ -110,6 +152,9 @@ const AttendanceDialog = ({ visible, onHide, selectedDay, lessonIndex, classNumb
                 />
             }
         >
+            {/* TOAST בתוך ה־Dialog */}
+            <Toast ref={toast} position="top-center" />
+
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                     <tr style={{ backgroundColor: '#f4f4f4' }}>
@@ -135,22 +180,19 @@ const AttendanceDialog = ({ visible, onHide, selectedDay, lessonIndex, classNumb
                                     <div style={{ display: 'flex', gap: '10px' }}>
                                         <Button
                                             label="Present"
-                                            className={`p-button ${currentStatus === 'Present' ? 'p-button-success' : 'p-button-outlined'
-                                                }`}
+                                            className={`p-button ${currentStatus === 'Present' ? 'p-button-success' : 'p-button-outlined'}`}
                                             onClick={() => handleStatusChange(student.idNumber, 'Present')}
                                             style={{ minWidth: '75px' }}
                                         />
                                         <Button
                                             label="Late"
-                                            className={`p-button ${currentStatus === 'Late' ? 'p-button-warning' : 'p-button-outlined'
-                                                }`}
+                                            className={`p-button ${currentStatus === 'Late' ? 'p-button-warning' : 'p-button-outlined'}`}
                                             onClick={() => handleStatusChange(student.idNumber, 'Late')}
                                             style={{ minWidth: '75px' }}
                                         />
                                         <Button
                                             label="Absent"
-                                            className={`p-button ${currentStatus === 'Absent' ? 'p-button-danger' : 'p-button-outlined'
-                                                }`}
+                                            className={`p-button ${currentStatus === 'Absent' ? 'p-button-danger' : 'p-button-outlined'}`}
                                             onClick={() => handleStatusChange(student.idNumber, 'Absent')}
                                             style={{ minWidth: '75px' }}
                                         />

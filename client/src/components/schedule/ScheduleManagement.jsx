@@ -11,22 +11,6 @@ const ScheduleManagement = () => {
     const [classNumber, setClassNumber] = useState('');
     const [allClasses, setAllClasses] = useState([]);
     const [loading, setLoading] = useState(true);
-
-
-    //     axios.get('http://localhost:1235/api/student/getAllClasses', {
-    //         headers: {
-    //             Authorization: `Bearer ${'token'}`
-    //         }
-    //     })
-    //         .then(response => {
-    //             setAllClasses(response.data.map(Number));
-    //             setLoading(false);
-    //         })
-    //         .catch(err => {
-    //             console.error('Failed to fetch class numbers', err);
-    //             setLoading(false);
-    //         });
-    // }, []);
     const token = useSelector(state => state.user.token); // או כל מקום שבו אתה שומר את הטוקן
 
     useEffect(() => {

@@ -123,7 +123,8 @@ const StudentManagement = () => {
   }
 
   return (
-    <div className="card" style={{ backgroundColor: '#F4F4F4' }}>
+    <div className="card" style={{ backgroundColor: '#F4F4F4' ,textAlign: 'center'}}>
+   
       <Toast ref={toast} />
       <ConfirmDialog
         visible={showConfirm}
