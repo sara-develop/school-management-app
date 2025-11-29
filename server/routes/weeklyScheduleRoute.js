@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const verifyJWT = require('../middleware/verifyJWT');
-const WeeklyScheduleController = require("../controllers/weeklyScheduleControlle");
+const WeeklyScheduleController = require("../controllers/weeklyScheduleController");
 
 router.post("/createSchedule", verifyJWT, WeeklyScheduleController.createSchedule);
 router.get("/getSchedule", verifyJWT, WeeklyScheduleController.getSchedule);

@@ -1,90 +1,170 @@
 const nodemailer = require("nodemailer");
 const PDFDocument = require("pdfkit");
-const Student = require("./models/student"); 
+const Student = require("./models/student");
+const fs = require("fs");
 const pLimitImport = async () => (await import('p-limit')).default;
+const WeeklySchedule = require('./models/weeklySchedule');
 
-async function sendWeeklyAttendanceEmails() {
+// פונקציה גנרית לשליחת מייל
+async function sendEmail({ to, subject, text, html, attachments }) {
+    const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+        }
+    });
+
+    try {
+        await transporter.sendMail({ from: process.env.EMAIL_USER, to, subject, text, html, attachments });
+        console.log(`Email sent to ${to}`);
+    } catch (err) {
+        console.error("Error sending email:", err);
+        throw err;
+    }
+}
+
+// שליחת מייל איפוס סיסמה
+async function sendResetEmail(to, token) {
+    const resetLink = `http://localhost:3000/reset-password/${token}`;
+    await sendEmail({
+        to,
+        subject: "Reset Your Password",
+        text: `Click here to reset your password: ${resetLink}`,
+    });
+}
+
+// פונקציה לשליחת דוחות נוכחות שבועיים כטבלת HTML במייל
+async function sendWeeklyAttendanceEmails(customBodyText, parshaTitle) {
     try {
         const pLimit = await pLimitImport();
         const limit = pLimit(5);
 
         const students = await Student.find({ active: true });
 
-        const transporter = nodemailer.createTransport({
-            service: "gmail",
-            auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASS
+        const days = [
+            { key: 'sunday', label: 'ראשון' },
+            { key: 'monday', label: 'שני' },
+            { key: 'tuesday', label: 'שלישי' },
+            { key: 'wednesday', label: 'רביעי' },
+            { key: 'thursday', label: 'חמישי' },
+        ];
+
+        // טקסט ברירת מחדל
+        const defaultBodyText =
+            `Hi,
+
+Attached is your daughter's attendance for the week.
+
+Thank you,`;
+
+        const bodyText = (customBodyText && customBodyText.trim())
+            ? customBodyText
+            : defaultBodyText;
+
+        // פרשה — אך אם ריק → לא מציג כלל
+        const effectiveParshaTitle =
+            (parshaTitle && parshaTitle.trim())
+                ? parshaTitle.trim()
+                : null; // 👈 אם אין פרשה – null
+
+        // הוספת תצוגה יפה (רק אם קיימת פרשה)
+        const parshaDisplay = effectiveParshaTitle
+            ? ` - ${effectiveParshaTitle}`
+            : ""; // 👈 אחרת לא מציג כלום
+
+        const buildHtmlBodyFromText = (text) => {
+            return text
+                .split(/\n{2,}/)
+                .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+                .join('\n');
+        };
+
+        const htmlIntro = buildHtmlBodyFromText(bodyText);
+
+        const statusToSymbol = (status) => {
+            switch (status) {
+                case 'Present': return 'P';
+                case 'Late': return 'L';
+                case 'Absent': return 'A';
+                default: return '';
             }
-        });
+        };
 
-        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
+        const sendMailForStudent = async (student) => {
+            const attendance = student.weeklyAttendance || {};
 
-        const sendMailForStudent = (student) => {
-            return new Promise((resolve, reject) => {
-                const doc = new PDFDocument({ margin: 50 });
-                let buffers = [];
-                doc.on('data', buffers.push.bind(buffers));
+            const maxLessons = Math.max(
+                0,
+                ...days.map(d => (attendance[d.key] || []).length)
+            );
 
-                const attendance = student.weeklyAttendance || {};
-                const maxLessons = Math.max(...days.map(day =>
-                    (attendance[day.toLowerCase()] || []).length
-                ));
+            if (maxLessons === 0) {
+                console.log(`No attendance data for ${student.name}, skipping email`);
+                return;
+            }
 
-                doc.font('Helvetica-Bold')
-                    .fontSize(18)
-                    .text(`Weekly Attendance Report - ${student.name}`, { align: 'left' });
-                doc.moveDown();
+            // ---- בניית ה־HTML ----
+            let html = `
+                ${htmlIntro}
 
-                const startX = 50;
-                const columnWidth = 90;
-                let y = doc.y;
+                <div style="width:100%; text-align:center; margin-top:20px;" dir="rtl">
+                <table border="1" cellpadding="6" cellspacing="0"
+                    style="
+                        border-collapse: collapse;
+                        margin-left:auto;
+                        margin-right:auto;
+                        text-align: center;
+                        font-family: Arial, sans-serif;
+                    "
+                >
+                    <thead>
+                        <tr>
+                            <th colspan="${maxLessons + 2}" 
+                            style="text-align:center; font-size:16px; padding:8px; font-weight:normal;">
+                                ${student.name}${parshaDisplay}
+                            </th>
+                        </tr>
+                        <tr>
+                    <th style="font-weight: normal;">יום</th>
+            `;
 
-                doc.font('Helvetica-Bold').fontSize(12);
-                doc.text('Lesson #', startX, y, { width: columnWidth, align: 'center' });
-                days.forEach((day, i) => {
-                    doc.text(day, startX + columnWidth * (i + 1), y, { width: columnWidth, align: 'center' });
-                });
+            for (let i = 0; i < maxLessons; i++) {
+                html += `<th style="font-weight: normal;">שיעור ${i + 1}</th>`;
+            }
+
+            html += `
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            days.forEach(d => {
+                html += `<tr>`;
+                html += `<td>${d.label}</td>`;
 
                 for (let i = 0; i < maxLessons; i++) {
-                    y += 20;
-                    doc.font('Helvetica-Bold').text(`${i + 1}`, startX, y, {
-                        width: columnWidth,
-                        align: 'center'
-                    });
-
-                    days.forEach((day, j) => {
-                        const status = attendance[day.toLowerCase()]?.[i]?.status || '';
-                        doc.font('Helvetica')
-                            .text(status, startX + columnWidth * (j + 1), y, {
-                                width: columnWidth,
-                                align: 'center'
-                            });
-                    });
+                    const dayEntries = attendance[d.key] || [];
+                    const entry = dayEntries.find(e => Number(e.lessonIndex) === i);
+                    html += `<td>${statusToSymbol(entry?.status)}</td>`;
                 }
 
-                doc.end();
+                html += `</tr>`;
+            });
 
-                doc.on('end', async () => {
-                    const pdfData = Buffer.concat(buffers);
-                    try {
-                        await transporter.sendMail({
-                            from: process.env.EMAIL_USER,
-                            to: student.parentEmail,
-                            subject: `Attendance Report for ${student.name}`,
-                            text: `Hi,\n\nAttached is your daughter's attendance for the week.\n\nThank you.`,
-                            attachments: [
-                                {
-                                    filename: `attendance_${student.name}.pdf`,
-                                    content: pdfData
-                                }
-                            ]
-                        });
-                        resolve();
-                    } catch (err) {
-                        reject(err);
-                    }
-                });
+            html += `
+                    </tbody>
+                </table>
+                </div>
+            `;
+
+            await sendEmail({
+                to: student.parentEmail,
+                subject: `Attendance Report`,
+                text: bodyText + `
+
+(Attendance table is shown in the email body.)`,
+                html,
             });
         };
 
@@ -95,40 +175,32 @@ async function sendWeeklyAttendanceEmails() {
         return { message: "Emails sent successfully!" };
 
     } catch (err) {
-        console.error(err);
+        console.error("Error sending weekly attendance emails:", err);
         throw new Error(err.message || "Error sending emails");
     }
 }
 
 function isValidId(id) {
-    if (id.length !== 9 || !/^\d+$/.test(id)) {
-        return false;
-    }
+    if (id.length !== 9 || !/^\d+$/.test(id)) return false;
     let sum = 0;
     for (let i = 0; i < 9; i++) {
-        let digit = parseInt(id[i])
+        let digit = parseInt(id[i]);
         if (i % 2 === 1) {
             digit *= 2;
-            if (digit > 9) {
-                digit -= 9;
-            }
+            if (digit > 9) digit -= 9;
         }
         sum += digit;
     }
-
     return sum % 10 === 0;
 }
 
+// איפוס נוכחות שבועית
 const resetWeeklyAttendance = async () => {
     try {
         await Student.updateMany({}, {
             $set: {
                 weeklyAttendance: {
-                    sunday: [],
-                    monday: [],
-                    tuesday: [],
-                    wednesday: [],
-                    thursday: []
+                    sunday: [], monday: [], tuesday: [], wednesday: [], thursday: []
                 }
             }
         });
@@ -138,4 +210,10 @@ const resetWeeklyAttendance = async () => {
     }
 };
 
-module.exports = { isValidId, resetWeeklyAttendance, sendWeeklyAttendanceEmails };
+module.exports = {
+    isValidId,
+    resetWeeklyAttendance,
+    sendWeeklyAttendanceEmails,
+    sendResetEmail,
+    sendEmail
+};

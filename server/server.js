@@ -7,6 +7,7 @@ const mongoose = require("mongoose")
 const cron = require('node-cron');
 
 // קבצים פנימיים
+const { resetScheduleForClass1 } = require("./controllers/weeklyScheduleController");
 const corsOptions = require("./config/corsOptions")
 const connectDB = require("./config/dbconn")
 const { resetWeeklyAttendance } = require('./utils'); // אם הפרדת לפונקציה נפרדת
@@ -39,16 +40,20 @@ cron.schedule('0 0 * * 0', () => {
   resetWeeklyAttendance();
 });
 
-//אם את רוצה להריץ את זה פעם אחת בדיוק בדקה הבאה
-// setTimeout(() => {
-//     console.log('Running one-time attendance reset task');
-//     resetWeeklyAttendance();
-// }, 60 * 1000); // 60 שניות = דקה
-
 // cron.schedule('38 16 * * 1', () => {
 //   console.log('Running weekly attendance reset task at Monday 16:38');
 //   resetWeeklyAttendance();
 // });
+
+// setTimeout(() => {
+//     console.log('Running one-time attendance reset task');
+//     resetWeeklyAttendance();
+// }, 60);
+
+// setTimeout(() => {
+//     console.log("Running one-time reset for schedule class 1");
+//     resetScheduleForClass1();
+// }, 50);
 
 
 // התחלת האזנה לשרת לאחר חיבור למסד נתונים

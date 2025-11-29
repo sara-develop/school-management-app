@@ -1,5 +1,5 @@
 const Student = require("../models/student");
-const WeeklySchedule = require("../models/weeklySchedule"); 
+const WeeklySchedule = require("../models/weeklySchedule");
 const { isValidId } = require("../utils")
 const { sendWeeklyAttendanceEmails } = require("../utils");
 
@@ -79,25 +79,53 @@ const getAll = async (req, res) => {
 }
 
 const updateStudent = async (req, res) => {
-    const { id } = req.params
-    const { name, idNumber, parentEmail, classNumber } = req.body
-
-    if (!name || !idNumber || !parentEmail || !classNumber) {
-        return res.status(400).json({ message: 'All fields are required' })
-    }
-
-    if (!isValidId(idNumber)) {
-        return res.status(400).json({ message: 'Invalid ID number format' })
-    }
-
     try {
-        const student = await Student.findByIdAndUpdate(id, { name, idNumber, parentEmail, classNumber }, { new: true })
-        if (!student) return res.status(404).json({ message: "Student not found" })
-        res.status(200).json(student)
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to update student', error })
+        const { id } = req.params; // זה ה-_id של הסטודנט
+        if (!id) return res.status(400).json({ message: "Missing student id in URL" });
+
+        const { name, idNumber, parentEmail, classNumber } = req.body;
+
+        // ולידציה בסיסית
+        if (!name || !idNumber || !parentEmail || classNumber === undefined) {
+            return res.status(400).json({ message: "All fields are required (name, idNumber, parentEmail, classNumber)" });
+        }
+
+        // ודאי שהסטודנט קיים
+        const existing = await Student.findById(id);
+        if (!existing) return res.status(404).json({ message: "Student not found" });
+
+        // בדיקת כפילות ל-idNumber אם שונה
+        if (existing.idNumber !== idNumber) {
+            const duplicate = await Student.findOne({ idNumber, _id: { $ne: id } }).lean();
+            if (duplicate) return res.status(409).json({ message: "Duplicate idNumber" });
+        }
+
+        // בניית אובייקט עדכון "מותר"
+        const update = {
+            name: String(name).trim(),
+            idNumber: String(idNumber).trim(),
+            parentEmail: String(parentEmail).trim(),
+            classNumber: Number(classNumber),
+        };
+
+        // עדכון עם ולידציות של המודל
+        const updated = await Student.findByIdAndUpdate(id, update, {
+            new: true,
+            runValidators: true,
+            context: "query",
+        });
+
+        return res.status(200).json(updated);
+    } catch (err) {
+        // טיפול בשגיאת אינדקס ייחודי
+        if (err?.code === 11000) {
+            return res.status(409).json({ message: "Duplicate key", keyValue: err.keyValue });
+        }
+        // החזרת הודעת שגיאה שימושית
+        return res.status(400).json({ message: "Update failed", error: err?.message });
     }
-}
+};
+
 
 const updateActive = async (req, res) => {
     const { id } = req.params
@@ -128,44 +156,58 @@ const deleteById = async (req, res) => {
 }
 
 const updateAttendanceForLesson = async (req, res) => {
-    const { classNumber, day, lessonId, attendanceUpdates } = req.body;
+    console.log("=== UPDATE ATTENDANCE START ===");
+    console.log("BODY:", req.body);
 
-    if (!classNumber || !day || !lessonId || !attendanceUpdates) {
-        return res.status(400).json({ message: "Class number, day, lesson ID, and attendance updates are required" });
+    const { classNumber, day, lessonId, lessonIndex, attendanceUpdates } = req.body;
+
+    if (!classNumber || !day || !lessonId || lessonIndex === undefined || !attendanceUpdates) {
+        return res.status(400).json({ message: "Missing required fields" });
     }
 
     try {
         const students = await Student.find({ classNumber });
 
-        if (!students || students.length === 0) {
-            return res.status(404).json({ message: "No students found for this class" });
-        }
+        const normalizedLessonId = String(lessonId);
+        const normalizedLessonIndex = Number(lessonIndex);
 
         for (const update of attendanceUpdates) {
             const student = students.find(s => s.idNumber === update.idNumber);
-            if (student) {
-                // בדוק אם יש נוכחות ליום ולשיעור הספציפי
-                const attendanceDay = student.weeklyAttendance[day] || [];
-                const lessonIndex = attendanceDay.findIndex(l => l.lessonId.toString() === lessonId);
+            if (!student) continue;
 
-                if (lessonIndex !== -1) {
-                    // עדכן את הסטטוס של השיעור הקיים
-                    attendanceDay[lessonIndex].status = update.status;
-                } else {
-                    // הוסף שיעור חדש עם הסטטוס
-                    attendanceDay.push({ lessonId, status: update.status });
-                }
-
-                // עדכן את הנוכחות ליום הספציפי
-                student.weeklyAttendance[day] = attendanceDay;
-                await student.save();
+            if (!Array.isArray(student.weeklyAttendance[day])) {
+                student.weeklyAttendance[day] = [];
             }
+
+            const attendanceDay = student.weeklyAttendance[day];
+
+            const existingIndex = attendanceDay.findIndex(l => {
+                const storedLessonId = l.lessonId ? String(l.lessonId) : null;
+                const storedLessonIndex = Number(l.lessonIndex);
+                return (
+                    storedLessonId === normalizedLessonId &&
+                    storedLessonIndex === normalizedLessonIndex
+                );
+            });
+
+            if (existingIndex !== -1) {
+                attendanceDay[existingIndex].status = update.status;
+            } else {
+                attendanceDay.push({
+                    lessonId: normalizedLessonId,
+                    lessonIndex: normalizedLessonIndex,
+                    status: update.status
+                });
+            }
+
+            await student.save();
         }
 
-        res.status(200).json({ message: "Attendance updated successfully" });
+        return res.status(200).json({ message: "Attendance updated successfully" });
+
     } catch (err) {
         console.error("Error updating attendance:", err);
-        res.status(500).json({ message: "Failed to update attendance", error: err });
+        return res.status(500).json({ message: "Failed to update attendance", error: err });
     }
 };
 
@@ -190,10 +232,10 @@ const getStudentByClassNumber = async (req, res) => {
 };
 
 const getAttendanceByLesson = async (req, res) => {
-    const { classNumber, day, lessonId } = req.params;
+    const { classNumber, day, lessonId, lessonIndex } = req.params;
 
-    if (!classNumber || !day || !lessonId) {
-        return res.status(400).json({ message: "Class number, day, and lesson ID are required" });
+    if (!classNumber || !day || !lessonId || lessonIndex === undefined) {
+        return res.status(400).json({ message: "Class number, day, lesson ID and lessonIndex are required" });
     }
 
     try {
@@ -203,9 +245,16 @@ const getAttendanceByLesson = async (req, res) => {
             return res.status(404).json({ message: "No students found for this class" });
         }
 
+        const normalizedLessonId = String(lessonId);
+        const normalizedLessonIndex = Number(lessonIndex);
+
         const attendanceData = students.map(student => {
             const attendanceDay = student.weeklyAttendance[day] || [];
-            const lesson = attendanceDay.find(l => l.lessonId.toString() === lessonId);
+            const lesson = attendanceDay.find(l =>
+                String(l.lessonId) === normalizedLessonId &&
+                Number(l.lessonIndex) === normalizedLessonIndex
+            );
+
             return {
                 idNumber: student.idNumber,
                 name: student.name,
@@ -222,7 +271,8 @@ const getAttendanceByLesson = async (req, res) => {
 
 const sendWeeklyAttendanceEmailsHandler = async (req, res) => {
     try {
-        const result = await sendWeeklyAttendanceEmails();
+        const { bodyText, parshaTitle } = req.body; // שניהם מהפרונט
+        const result = await sendWeeklyAttendanceEmails(bodyText, parshaTitle);
         res.json(result);
     } catch (error) {
         res.status(500).json({ message: error.message || "Error sending emails" });
@@ -231,5 +281,15 @@ const sendWeeklyAttendanceEmailsHandler = async (req, res) => {
 
 
 module.exports = {
-    addStudent, getById, getAll, updateStudent, updateActive, deleteById, getAllClasses, updateAttendanceForLesson, getStudentByClassNumber, getAttendanceByLesson, sendWeeklyAttendanceEmailsHandler
+    addStudent,
+    getById,
+    getAll,
+    updateStudent,
+    updateActive,
+    deleteById,
+    getAllClasses,
+    updateAttendanceForLesson,
+    getStudentByClassNumber,
+    getAttendanceByLesson,
+    sendWeeklyAttendanceEmailsHandler
 }

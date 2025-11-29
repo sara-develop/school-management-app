@@ -1,5 +1,29 @@
 const WeeklySchedule = require('../models/weeklySchedule');
 
+const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday'];
+
+// פונקציה שמוודאת שלכל שיעור במערך יש lessonIndex נכון לפי האינדקס שלו
+const withLessonIndexes = (lessons = []) => {
+    return lessons.map((l, idx) => {
+        if (!l || !l.lessonId) return null;
+        return {
+            lessonId: l.lessonId,
+            lessonIndex: idx
+        };
+    });
+};
+
+
+const checkLessonsBeforeUpdate = async (classNumber, day, lessonIndex) => {
+    const schedule = await WeeklySchedule.findOne({ classNumber }).lean();
+    if (!schedule || !schedule[day]) return false;
+
+    if (!Array.isArray(schedule[day].lessons)) schedule[day].lessons = [];
+
+    // לא מחזירים false אם השיעורים הקודמים ריקים
+    return true;
+};
+
 const createSchedule = async (req, res) => {
     const { classNumber } = req.body;
 
@@ -8,7 +32,15 @@ const createSchedule = async (req, res) => {
     }
 
     try {
-        const schedule = await WeeklySchedule.create({ classNumber });
+        const schedule = await WeeklySchedule.create({
+            classNumber,
+            sunday: { lessons: [] },
+            monday: { lessons: [] },
+            tuesday: { lessons: [] },
+            wednesday: { lessons: [] },
+            thursday: { lessons: [] }
+        });
+
         return res.status(201).json(schedule);
     } catch (err) {
         console.error('Error creating schedule:', err);
@@ -16,20 +48,24 @@ const createSchedule = async (req, res) => {
     }
 };
 
+
 const getScheduleByClassNumber = async (req, res) => {
     const { classNumber } = req.params;
 
     try {
         const schedule = await WeeklySchedule.findOne({ classNumber })
-            .populate('sunday.lessons')
-            .populate('monday.lessons')
-            .populate('tuesday.lessons')
-            .populate('wednesday.lessons')
-            .populate('thursday.lessons');
+            .populate("sunday.lessons.lessonId")
+            .populate("monday.lessons.lessonId")
+            .populate("tuesday.lessons.lessonId")
+            .populate("wednesday.lessons.lessonId")
+            .populate("thursday.lessons.lessonId");
 
         if (!schedule) {
             return res.status(404).json({ message: 'Schedule not found' });
         }
+
+        // הדפסה כדי לבדוק שהנתונים נטענים כראוי
+        console.log("Schedule data with populated lessons:", schedule);
 
         return res.status(200).json(schedule);
     } catch (err) {
@@ -47,11 +83,11 @@ const getSchedule = async (req, res) => {
 
     try {
         const schedule = await WeeklySchedule.findOne({ classNumber })
-            .populate('sunday.lessons')
-            .populate('monday.lessons')
-            .populate('tuesday.lessons')
-            .populate('wednesday.lessons')
-            .populate('thursday.lessons');
+            .populate("sunday.lessons.lessonId")
+            .populate("monday.lessons.lessonId")
+            .populate("tuesday.lessons.lessonId")
+            .populate("wednesday.lessons.lessonId")
+            .populate("thursday.lessons.lessonId");
 
         if (!schedule) {
             return res.status(404).json({ message: 'Schedule not found' });
@@ -79,8 +115,10 @@ const updateSchedule = async (req, res) => {
         }
 
         Object.entries(scheduleUpdates).forEach(([day, data]) => {
-            if (schedule[day]) {
-                schedule[day].lessons = data.lessons;
+            // נוודא שזה אכן יום חוקי
+            if (DAYS.includes(day) && schedule[day]) {
+                const lessons = Array.isArray(data.lessons) ? data.lessons : [];
+                schedule[day].lessons = withLessonIndexes(lessons);
             }
         });
 
@@ -99,6 +137,11 @@ const updateOneDaySchedule = async (req, res) => {
         return res.status(400).json({ message: 'Class number, day and lessons are required' });
     }
 
+    // ולידציה שהיום חוקי
+    if (!DAYS.includes(day)) {
+        return res.status(400).json({ message: 'Invalid day value' });
+    }
+
     try {
         const schedule = await WeeklySchedule.findOne({ classNumber });
 
@@ -106,7 +149,9 @@ const updateOneDaySchedule = async (req, res) => {
             return res.status(404).json({ message: 'Schedule not found' });
         }
 
-        schedule[day].lessons = lessons;
+        // כאן הקסם – השרת עצמו קובע lessonIndex לפי מיקום במערך
+        schedule[day].lessons = withLessonIndexes(lessons);
+
         await schedule.save();
 
         return res.status(200).json({ message: 'Day schedule updated' });
@@ -117,11 +162,12 @@ const updateOneDaySchedule = async (req, res) => {
 };
 
 const updateLessonInSchedule = async (req, res) => {
-    console.log('updateLessonInSchedule lesson in schedule:');
     const { classNumber, day, lessonIndex, lessonId } = req.body;
 
     if (!classNumber || !day || lessonIndex === undefined || !lessonId) {
-        return res.status(400).json({ message: 'classNumber, day, lessonIndex, and lessonId are required' });
+        return res.status(400).json({
+            message: 'classNumber, day, lessonIndex, and lessonId are required'
+        });
     }
 
     try {
@@ -131,23 +177,41 @@ const updateLessonInSchedule = async (req, res) => {
             return res.status(404).json({ message: 'Schedule not found' });
         }
 
-        if (!schedule[day] || !Array.isArray(schedule[day].lessons)) {
-            schedule[day] = { lessons: [] };
+        if (!schedule[day]) schedule[day] = { lessons: [] };
+
+        const lessons = schedule[day].lessons;
+
+        // ודא שהמערך מכיל null ולא {}
+        while (lessons.length <= lessonIndex) {
+            lessons.push(null);
         }
 
-        while (schedule[day].lessons.length <= lessonIndex) {
-            schedule[day].lessons.push(null);
+        // בדיקה: אסור לשים שיעור ללא הקודם
+        if (lessonIndex > 0) {
+            const prev = lessons[lessonIndex - 1];
+            if (!prev) {
+                return res.status(400).json({
+                    message: `אי אפשר להכניס שיעור מספר ${lessonIndex + 1} לפני שמגדירים את שיעור מספר ${lessonIndex}`
+                });
+            }
         }
 
-        schedule[day].lessons[lessonIndex] = lessonId;
+        lessons[lessonIndex] = {
+            lessonId,
+            lessonIndex
+        };
 
         await schedule.save();
-        return res.status(200).json({ message: 'Lesson updated in schedule' });
+
+        return res.status(200).json({ message: 'Lesson updated successfully' });
+
     } catch (err) {
         console.error('Error updating lesson:', err);
         return res.status(500).json({ message: 'Update failed' });
     }
 };
+
+
 
 const deleteSchedule = async (req, res) => {
     const { classNumber } = req.body;
@@ -170,6 +234,31 @@ const deleteSchedule = async (req, res) => {
     }
 };
 
+const resetScheduleForClass1 = async () => {
+    try {
+        const classNumber = 1;
+
+        const schedule = await WeeklySchedule.findOne({ classNumber });
+
+        if (!schedule) {
+            console.log("No schedule found for class 1");
+            return;
+        }
+
+        schedule.sunday.lessons = [];
+        schedule.monday.lessons = [];
+        schedule.tuesday.lessons = [];
+        schedule.wednesday.lessons = [];
+        schedule.thursday.lessons = [];
+
+        await schedule.save();
+
+        console.log("Weekly schedule for class 1 has been cleared successfully!");
+    } catch (err) {
+        console.error("Error clearing schedule:", err);
+    }
+};
+
 module.exports = {
     createSchedule,
     getSchedule,
@@ -177,5 +266,6 @@ module.exports = {
     updateOneDaySchedule,
     updateLessonInSchedule,
     deleteSchedule,
-    getScheduleByClassNumber
+    getScheduleByClassNumber,
+    resetScheduleForClass1
 };

@@ -5,8 +5,10 @@ const User = require("../controllers/userController")
 const verifyJWT = require('../middleware/verifyJWT')
 
 // פתוח לכולם
-
 router.post("/login", User.login)
+router.post("/forgotPassword", User.forgotPassword)
+router.post("/resetPassword", User.resetPassword)
+
 
 // רק למשתמשים שמחוברים
 router.put("/updateUser", verifyJWT, User.updateUser)

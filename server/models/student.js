@@ -1,5 +1,20 @@
 const mongoose = require("mongoose");
 
+const attendanceEntrySchema = new mongoose.Schema({
+    lessonId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Lesson"
+    },
+    lessonIndex: {
+        type: Number   // ← הוספנו אינדקס של השיעור באותו יום
+    },
+    status: {
+        type: String,
+        enum: ['Present', 'Late', 'Absent'],
+        default: 'Absent'
+    }
+}, { _id: true });
+
 const studentSchema = new mongoose.Schema({
     name: {
         type: String,
@@ -26,46 +41,11 @@ const studentSchema = new mongoose.Schema({
     },
     weeklyAttendance: {
         type: {
-            sunday: [{ 
-                lessonId: mongoose.Schema.Types.ObjectId, 
-                status: { 
-                    type: String, 
-                    enum: ['Present', 'Late', 'Absent'], 
-                    default: 'Absent' 
-                } 
-            }],
-            monday: [{ 
-                lessonId: mongoose.Schema.Types.ObjectId, 
-                status: { 
-                    type: String, 
-                    enum: ['Present', 'Late', 'Absent'], 
-                    default: 'Absent' 
-                } 
-            }],
-            tuesday: [{ 
-                lessonId: mongoose.Schema.Types.ObjectId, 
-                status: { 
-                    type: String, 
-                    enum: ['Present', 'Late', 'Absent'], 
-                    default: 'Absent' 
-                } 
-            }],
-            wednesday: [{ 
-                lessonId: mongoose.Schema.Types.ObjectId, 
-                status: { 
-                    type: String, 
-                    enum: ['Present', 'Late', 'Absent'], 
-                    default: 'Absent' 
-                } 
-            }],
-            thursday: [{ 
-                lessonId: mongoose.Schema.Types.ObjectId, 
-                status: { 
-                    type: String, 
-                    enum: ['Present', 'Late', 'Absent'], 
-                    default: 'Absent' 
-                } 
-            }]
+            sunday: [attendanceEntrySchema],
+            monday: [attendanceEntrySchema],
+            tuesday: [attendanceEntrySchema],
+            wednesday: [attendanceEntrySchema],
+            thursday: [attendanceEntrySchema]
         },
         default: {
             sunday: [],

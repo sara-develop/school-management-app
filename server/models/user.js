@@ -14,11 +14,26 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+
+    email: {
+        type: String,
+        required: true
+    },
+
+    resetToken: {
+        type: String
+    },
+
+    resetTokenExpire: {
+        type: Date
+    },
+
     role: {
         type: String,
         required: true,
-        enum: ['principal', 'secretary']
-    }
+        enum: ['principal', 'secretary'],
+        default: 'secretary'
+    },
 }, {
     timestamps: true
 });
